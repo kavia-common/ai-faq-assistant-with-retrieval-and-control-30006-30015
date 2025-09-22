@@ -88,6 +88,7 @@
   border-color: rgba(239,68,68,0.28);
 }
 
+/* Optional subtle visual cue when input invalid by aria-invalid */
 .composer {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -107,6 +108,10 @@
 .composer input:focus {
   border-color: rgba(37,99,235,0.5);
   box-shadow: 0 0 0 4px rgba(37,99,235,0.14);
+}
+.composer input[aria-invalid="true"] {
+  border-color: rgba(239,68,68,0.55);
+  box-shadow: 0 0 0 4px rgba(239,68,68,0.14);
 }
 .composer button {
   min-width: 100px;

@@ -16,11 +16,26 @@
         <p>{{ m.content }}</p>
       </div>
     </div>
+
+    <!-- Filter feedback area (non-blocking, subtle) -->
+    <div *ngIf="filterFeedback" class="message error">
+      <div class="avatar">!</div>
+      <div class="bubble">
+        <p>{{ filterFeedback }}</p>
+      </div>
+    </div>
   </div>
 
   <div class="composer">
-    <input type="text" placeholder="Ask a question..." [(ngModel)]="input" (keyup.enter)="send()" [disabled]="sending" />
-    <button (click)="send()" [disabled]="sending || !input.trim()">
+    <input
+      type="text"
+      placeholder="Ask a question..."
+      [(ngModel)]="input"
+      (keyup.enter)="send()"
+      [disabled]="sending"
+      [attr.aria-invalid]="!!filterFeedback"
+    />
+    <button (click)="send()" [disabled]="sending || !input || !input.trim().length">
       {{ sending ? 'Sending...' : 'Send' }}
     </button>
   </div>
