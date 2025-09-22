@@ -1,0 +1,4 @@
+{
+    "command": "npm install --legacy-peer-deps",
+    "working_directory": "/home/kavia/workspace/code-generation/ai-faq-assistant-with-retrieval-and-control-30006-30015/faq_chatbox_frontend"
+}
