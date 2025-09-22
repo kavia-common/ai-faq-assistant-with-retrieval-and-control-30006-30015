@@ -10,7 +10,7 @@
   </div>
 
   <div class="messages">
-    <!-- When filter is active after Send, show grouped filtered results -->
+    <!-- Live filter view: updates as user types; falls back to full history when no query -->
     <ng-container *ngIf="filterMatches; else fullHistory">
       <div class="message" *ngIf="filteredFaqs.length === 0 && filteredMessages.length === 0">
         <div class="avatar">A</div>
@@ -24,7 +24,7 @@
         <div class="message">
           <div class="avatar">F</div>
           <div class="bubble">
-            <p><strong>FAQ Matches</strong></p>
+            <p><strong>FAQ Matches</strong> <span *ngIf="lastQuery">for “{{ lastQuery }}”</span></p>
           </div>
         </div>
         <div *ngFor="let f of filteredFaqs" class="message">
@@ -41,7 +41,7 @@
         <div class="message">
           <div class="avatar">H</div>
           <div class="bubble">
-            <p><strong>Chat History Matches</strong></p>
+            <p><strong>Chat History Matches</strong> <span *ngIf="lastQuery">for “{{ lastQuery }}”</span></p>
           </div>
         </div>
         <div *ngFor="let m of filteredMessages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
@@ -75,8 +75,9 @@
   <div class="composer">
     <input
       type="text"
-      placeholder="Ask a question..."
+      placeholder="Ask a question... (live search)"
       [(ngModel)]="input"
+      (ngModelChange)="onInputChanged($event)"
       (keyup.enter)="send()"
       [disabled]="sending"
       [attr.aria-invalid]="!!filterFeedback"

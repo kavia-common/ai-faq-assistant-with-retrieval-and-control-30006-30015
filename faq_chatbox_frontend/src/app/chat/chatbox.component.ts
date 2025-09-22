@@ -28,7 +28,7 @@ export class ChatboxComponent implements OnDestroy {
   /** Holds latest filter feedback message to show to the user, if any. */
   filterFeedback: string | null = null;
 
-  /** When true, UI shows only filtered results computed after Send. */
+  /** When true, UI shows only filtered results computed from current input (live). */
   filterMatches = false;
 
   /** Cached filtered results to show when filterMatches is true. */
@@ -75,14 +75,18 @@ export class ChatboxComponent implements OnDestroy {
     // Listen to topic updates from sidebar
     this.sub = this.topicsBridge.topic$.subscribe((topic) => {
       this.activeTopic = topic;
-      // Reset filter view on topic change to keep UX predictable
+      // Reset filter view on topic change; live input will recompute automatically
       this.resetFilterView();
-
+      // Provide subtle system message to note context change
       if (topic) {
         this.messages.push({
           role: 'system',
           content: `Context updated to topic: ${topic.replace('-', ' ')}`
         });
+      }
+      // If there is text currently in the input, recompute live filters for the new topic
+      if (this.input && this.input.trim().length) {
+        this.updateLiveFilters(this.input);
       }
     });
   }
@@ -99,10 +103,9 @@ export class ChatboxComponent implements OnDestroy {
     // Basic trim and whitespace normalization
     let text = (raw ?? '').replace(/\s+/g, ' ').trim();
 
-    // If the user cleared the input, reset the filtered view.
+    // When invoked for live changes, allow empty to reset the view.
     if (!text) {
-      this.resetFilterView();
-      return { cleaned: null, feedback: 'Please enter a question before sending.' };
+      return { cleaned: null };
     }
 
     // Example banned words list for demo; extend as needed.
@@ -112,7 +115,7 @@ export class ChatboxComponent implements OnDestroy {
     if (bannedRegex.test(text)) {
       // Option B: mask banned words and proceed
       text = text.replace(bannedRegex, '****');
-      // Provide subtle feedback but allow send
+      // Provide subtle feedback but allow search/send
       return { cleaned: text, feedback: 'Note: Certain words were masked for safety.' };
     }
 
@@ -170,52 +173,71 @@ export class ChatboxComponent implements OnDestroy {
     this.lastQuery = '';
   }
 
+  /** Update filtered view based on a query, enabling grouped live results. */
+  private updateLiveFilters(query: string) {
+    const { cleaned, feedback } = this.filterInput(query);
+    // Set feedback only if present; do not mark invalid on simple empties
+    this.filterFeedback = feedback ?? null;
+
+    if (!cleaned) {
+      // On empty query, reset to full history
+      this.resetFilterView();
+      return;
+    }
+    this.lastQuery = cleaned;
+    this.filteredFaqs = this.computeFilteredFaqs(cleaned);
+    this.filteredMessages = this.computeFilteredHistory(cleaned);
+    this.filterMatches = true;
+  }
+
   // PUBLIC_INTERFACE
-  /** Send a user message to the assistant; uses RAG/MCP mock pipeline for response and filters visible data based on the input. */
+  /** Handle input changes to perform live filtering as the user types. */
+  onInputChanged(value: string) {
+    this.input = value ?? '';
+    // Live-update filters; when cleared, we reset automatically
+    this.updateLiveFilters(this.input);
+  }
+
+  // PUBLIC_INTERFACE
+  /** Send a user message to the assistant; uses RAG/MCP mock pipeline. Keeps live filter active after sending. */
   async send() {
     if (this.sending) return;
 
     const { cleaned, feedback } = this.filterInput(this.input);
-    this.filterFeedback = feedback ?? null;
-
+    // If user tries to send empty, provide gentle feedback but do not block typing UX
     if (!cleaned) {
-      // Do not send; keep the input so user can fix it
+      this.filterFeedback = 'Please enter a question before sending.';
       return;
     }
+    this.filterFeedback = feedback ?? null;
 
-    // Compute filtered results across FAQs and chat history (frontend only)
+    // Keep live filtered view based on the message being sent
     this.lastQuery = cleaned;
     this.filteredFaqs = this.computeFilteredFaqs(cleaned);
     this.filteredMessages = this.computeFilteredHistory(cleaned);
     this.filterMatches = true;
 
     this.sending = true;
-    // Clear input for UX once we're sending
-    this.input = '';
-    // Clear previous feedback once message accepted
-    // (We keep "masked" feedback visible briefly as a system note for transparency)
-    const showMaskNote = !!feedback && /masked/i.test(feedback);
 
-    // Push user message into conversation history (not visible while filter mode is active unless it matches)
+    // Push user message into conversation; clear composer for responsiveness
     this.messages.push({ role: 'user', content: cleaned });
+    this.input = '';
 
-    // Optionally add a system note if masking occurred
-    if (showMaskNote) {
-      this.messages.push({
-        role: 'system',
-        content: 'Note: Certain words were masked for safety.'
-      });
+    // If masking happened, surface a system note
+    if (feedback && /masked/i.test(feedback)) {
+      this.messages.push({ role: 'system', content: 'Note: Certain words were masked for safety.' });
     }
 
     try {
-      // Still perform the usual RAG flow to generate an answer
       const response = await this.rag.ask(cleaned, { topic: this.activeTopic ?? undefined });
       this.messages.push(response);
 
-      // Update filtered view to reflect the newly added assistant response too
-      // Keep showing only matches after send
-      this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
-      this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
+      // Refresh current live filter view after assistant response arrives
+      if (this.lastQuery) {
+        this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
+        this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
+        this.filterMatches = true;
+      }
     } catch (e) {
       const errMsg: ChatMessage = {
         role: 'assistant',
@@ -223,9 +245,12 @@ export class ChatboxComponent implements OnDestroy {
         error: true
       };
       this.messages.push(errMsg);
-      // Update filtered set so the error is visible if it matches query (typically not)
-      this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
-      this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
+      // Update filtered results to reflect the error message if it matches
+      if (this.lastQuery) {
+        this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
+        this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
+        this.filterMatches = true;
+      }
       console.error(e);
     } finally {
       this.sending = false;
