@@ -10,12 +10,31 @@
   </div>
 
   <div class="messages">
-    <div *ngFor="let m of messages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
-      <div class="avatar" [class.user]="m.role==='user'">{{ m.role==='user' ? 'U' : m.role==='assistant' ? 'A' : 'S' }}</div>
-      <div class="bubble">
-        <p>{{ m.content }}</p>
+    <!-- When filter is active after Send, show only filtered results -->
+    <ng-container *ngIf="filterMatches; else fullHistory">
+      <div class="message" *ngIf="filteredMessages.length === 0">
+        <div class="avatar">A</div>
+        <div class="bubble">
+          <p>No matches found for "{{ lastQuery }}". Try different keywords or select a topic.</p>
+        </div>
       </div>
-    </div>
+      <div *ngFor="let m of filteredMessages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
+        <div class="avatar" [class.user]="m.role==='user'">{{ m.role==='user' ? 'U' : m.role==='assistant' ? 'A' : 'S' }}</div>
+        <div class="bubble">
+          <p>{{ m.content }}</p>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Otherwise show full conversation history -->
+    <ng-template #fullHistory>
+      <div *ngFor="let m of messages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
+        <div class="avatar" [class.user]="m.role==='user'">{{ m.role==='user' ? 'U' : m.role==='assistant' ? 'A' : 'S' }}</div>
+        <div class="bubble">
+          <p>{{ m.content }}</p>
+        </div>
+      </div>
+    </ng-template>
 
     <!-- Filter feedback area (non-blocking, subtle) -->
     <div *ngIf="filterFeedback" class="message error">

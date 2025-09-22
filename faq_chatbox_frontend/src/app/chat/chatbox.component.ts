@@ -28,6 +28,15 @@ export class ChatboxComponent implements OnDestroy {
   /** Holds latest filter feedback message to show to the user, if any. */
   filterFeedback: string | null = null;
 
+  /** When true, UI shows only filtered results computed after Send. */
+  filterMatches = false;
+
+  /** Cached filtered results to show when filterMatches is true. */
+  filteredMessages: ChatMessage[] = [];
+
+  /** Last query used for filtering; shown in UI. */
+  lastQuery: string = '';
+
   constructor(
     private rag: RagService,
     private topicsBridge: TopicsBridgeService,
@@ -36,6 +45,9 @@ export class ChatboxComponent implements OnDestroy {
     // Listen to topic updates from sidebar
     this.sub = this.topicsBridge.topic$.subscribe((topic) => {
       this.activeTopic = topic;
+      // Reset filter view on topic change to keep UX predictable
+      this.resetFilterView();
+
       if (topic) {
         this.messages.push({
           role: 'system',
@@ -66,9 +78,6 @@ export class ChatboxComponent implements OnDestroy {
     const bannedRegex = new RegExp(`\\b(${banned.join('|')})\\b`, 'gi');
 
     if (bannedRegex.test(text)) {
-      // Option A: block outright
-      // return { cleaned: null, feedback: 'Your message contains prohibited words. Please rephrase and try again.' };
-
       // Option B: mask banned words and proceed
       text = text.replace(bannedRegex, '****');
       // Provide subtle feedback but allow send
@@ -81,8 +90,46 @@ export class ChatboxComponent implements OnDestroy {
     return { cleaned: text };
   }
 
+  /**
+   * Build a local dataset to filter from:
+   * - System/assistant seed messages
+   * - Current conversation messages
+   * - Topic-specific mock knowledge (lightweight, via RagService private data is not accessible, so we approximate using existing messages)
+   * For demo purposes, we filter current messages only and prioritize assistant/system content.
+   */
+  private buildFilterDataset(): ChatMessage[] {
+    // Use the current messages as the dataset to filter; this includes assistant greetings and any system notes.
+    return this.messages.slice();
+  }
+
+  /**
+   * Execute filtering against the dataset using the query text and topic.
+   * - Case-insensitive substring match
+   * - If topic is active, keep system "Context updated" notes but otherwise filter uniformly
+   */
+  private computeFilteredResults(query: string): ChatMessage[] {
+    const q = query.toLowerCase();
+    const inTopic = this.activeTopic;
+    const data = this.buildFilterDataset();
+
+    return data.filter(m => {
+      // Always allow system context updates for visibility when topic is active
+      const isContextNote = m.role === 'system' && /Context updated to topic/i.test(m.content);
+      if (inTopic && isContextNote) return true;
+
+      return (m.content || '').toLowerCase().includes(q);
+    });
+  }
+
+  /** Reset filtering state to show full conversation. */
+  private resetFilterView() {
+    this.filterMatches = false;
+    this.filteredMessages = [];
+    this.lastQuery = '';
+  }
+
   // PUBLIC_INTERFACE
-  /** Send a user message to the assistant; uses RAG/MCP mock pipeline for response. */
+  /** Send a user message to the assistant; uses RAG/MCP mock pipeline for response and filters visible data based on the input. */
   async send() {
     if (this.sending) return;
 
@@ -94,6 +141,11 @@ export class ChatboxComponent implements OnDestroy {
       return;
     }
 
+    // Compute filtered results first (frontend only), and update the UI to show only matches.
+    this.lastQuery = cleaned;
+    this.filteredMessages = this.computeFilteredResults(cleaned);
+    this.filterMatches = true;
+
     this.sending = true;
     // Clear input for UX once we're sending
     this.input = '';
@@ -101,7 +153,7 @@ export class ChatboxComponent implements OnDestroy {
     // (We keep "masked" feedback visible briefly as a system note for transparency)
     const showMaskNote = !!feedback && /masked/i.test(feedback);
 
-    // Push user message
+    // Push user message into conversation history (not visible while filter mode is active unless it matches)
     this.messages.push({ role: 'user', content: cleaned });
 
     // Optionally add a system note if masking occurred
@@ -113,19 +165,25 @@ export class ChatboxComponent implements OnDestroy {
     }
 
     try {
+      // Still perform the usual RAG flow to generate an answer
       const response = await this.rag.ask(cleaned, { topic: this.activeTopic ?? undefined });
       this.messages.push(response);
+
+      // Update filtered view to reflect the newly added assistant response too
+      // Keep showing only matches after send
+      this.filteredMessages = this.computeFilteredResults(this.lastQuery);
     } catch (e) {
-      this.messages.push({
+      const errMsg: ChatMessage = {
         role: 'assistant',
         content: 'Sorry, something went wrong while fetching the answer.',
         error: true
-      });
+      };
+      this.messages.push(errMsg);
+      // Update filtered set so the error is visible if it matches query (typically not)
+      this.filteredMessages = this.computeFilteredResults(this.lastQuery);
       console.error(e);
     } finally {
       this.sending = false;
-      // Reset filter feedback after a successful cycle unless a hard block happened (not the case here).
-      this.filterFeedback = null;
 
       // Scroll bottom on browser only, guard SSR and globals
       if (isPlatformBrowser(this.platformId)) {
@@ -150,6 +208,7 @@ export class ChatboxComponent implements OnDestroy {
       { role: 'assistant', content: 'Chat cleared. How can I help you next?' }
     ];
     this.filterFeedback = null;
+    this.resetFilterView();
   }
 
   ngOnDestroy(): void {
