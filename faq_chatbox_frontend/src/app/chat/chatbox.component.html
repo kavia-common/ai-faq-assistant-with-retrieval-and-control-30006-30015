@@ -10,20 +10,47 @@
   </div>
 
   <div class="messages">
-    <!-- When filter is active after Send, show only filtered results -->
+    <!-- When filter is active after Send, show grouped filtered results -->
     <ng-container *ngIf="filterMatches; else fullHistory">
-      <div class="message" *ngIf="filteredMessages.length === 0">
+      <div class="message" *ngIf="filteredFaqs.length === 0 && filteredMessages.length === 0">
         <div class="avatar">A</div>
         <div class="bubble">
           <p>No matches found for "{{ lastQuery }}". Try different keywords or select a topic.</p>
         </div>
       </div>
-      <div *ngFor="let m of filteredMessages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
-        <div class="avatar" [class.user]="m.role==='user'">{{ m.role==='user' ? 'U' : m.role==='assistant' ? 'A' : 'S' }}</div>
-        <div class="bubble">
-          <p>{{ m.content }}</p>
+
+      <!-- FAQ Matches group -->
+      <ng-container *ngIf="filteredFaqs.length > 0">
+        <div class="message">
+          <div class="avatar">F</div>
+          <div class="bubble">
+            <p><strong>FAQ Matches</strong></p>
+          </div>
         </div>
-      </div>
+        <div *ngFor="let f of filteredFaqs" class="message">
+          <div class="avatar">F</div>
+          <div class="bubble">
+            <p><strong>{{ f.title }}</strong></p>
+            <p>{{ f.content }}</p>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Chat History Matches group -->
+      <ng-container *ngIf="filteredMessages.length > 0">
+        <div class="message">
+          <div class="avatar">H</div>
+          <div class="bubble">
+            <p><strong>Chat History Matches</strong></p>
+          </div>
+        </div>
+        <div *ngFor="let m of filteredMessages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
+          <div class="avatar" [class.user]="m.role==='user'">{{ m.role==='user' ? 'U' : m.role==='assistant' ? 'A' : 'S' }}</div>
+          <div class="bubble">
+            <p>{{ m.content }}</p>
+          </div>
+        </div>
+      </ng-container>
     </ng-container>
 
     <!-- Otherwise show full conversation history -->

@@ -79,6 +79,9 @@
   box-shadow: 0 10px 30px rgba(2,6,23,0.06);
   line-height: 1.5;
 }
+.message .bubble p strong {
+  color: #1D4ED8;
+}
 .message.user .bubble {
   background: rgba(37,99,235,0.06);
   border-color: rgba(37,99,235,0.18);

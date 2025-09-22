@@ -34,8 +34,38 @@ export class ChatboxComponent implements OnDestroy {
   /** Cached filtered results to show when filterMatches is true. */
   filteredMessages: ChatMessage[] = [];
 
+  /** Cached filtered FAQ results to show when filterMatches is true. */
+  filteredFaqs: Array<{ title: string; content: string }> = [];
+
   /** Last query used for filtering; shown in UI. */
   lastQuery: string = '';
+
+  /** Minimal mock FAQ catalog by topic to allow UI-side searching across title & content. */
+  private faqCatalog: Record<string, Array<{ title: string; content: string }>> = {
+    'getting-started': [
+      { title: 'Create an account', content: 'To get started, sign up and verify your email to activate your account.' },
+      { title: 'Initial setup', content: 'Use the dashboard to configure preferences and connect integrations.' },
+    ],
+    account: [
+      { title: 'Billing details', content: 'Update billing details under Settings > Billing and download invoices.' },
+      { title: 'Invoices & charges', content: 'Invoices are generated monthly and emailed to the account owner.' },
+    ],
+    security: [
+      { title: 'Authentication', content: 'We support SSO and MFA. Enable MFA for higher security.' },
+      { title: 'Access control', content: 'Use granular role-based access control (RBAC) to restrict permissions.' },
+    ],
+    api: [
+      { title: 'API keys', content: 'Generate and manage API keys from Settings > API.' },
+      { title: 'Rate limits', content: 'API rate limiting is enforced at 60 requests per minute.' },
+    ],
+    troubleshooting: [
+      { title: 'Common fixes', content: 'Clear cache and re-authenticate if something looks off.' },
+      { title: 'Contact support', content: 'Provide your request ID to support for detailed investigation.' },
+    ],
+    default: [
+      { title: 'General help', content: 'Ask about getting started, account & billing, security, API & integrations, or troubleshooting.' }
+    ]
+  };
 
   constructor(
     private rag: RagService,
@@ -69,7 +99,9 @@ export class ChatboxComponent implements OnDestroy {
     // Basic trim and whitespace normalization
     let text = (raw ?? '').replace(/\s+/g, ' ').trim();
 
+    // If the user cleared the input, reset the filtered view.
     if (!text) {
+      this.resetFilterView();
       return { cleaned: null, feedback: 'Please enter a question before sending.' };
     }
 
@@ -94,8 +126,6 @@ export class ChatboxComponent implements OnDestroy {
    * Build a local dataset to filter from:
    * - System/assistant seed messages
    * - Current conversation messages
-   * - Topic-specific mock knowledge (lightweight, via RagService private data is not accessible, so we approximate using existing messages)
-   * For demo purposes, we filter current messages only and prioritize assistant/system content.
    */
   private buildFilterDataset(): ChatMessage[] {
     // Use the current messages as the dataset to filter; this includes assistant greetings and any system notes.
@@ -103,11 +133,11 @@ export class ChatboxComponent implements OnDestroy {
   }
 
   /**
-   * Execute filtering against the dataset using the query text and topic.
+   * Execute filtering for chat history using the query text.
    * - Case-insensitive substring match
    * - If topic is active, keep system "Context updated" notes but otherwise filter uniformly
    */
-  private computeFilteredResults(query: string): ChatMessage[] {
+  private computeFilteredHistory(query: string): ChatMessage[] {
     const q = query.toLowerCase();
     const inTopic = this.activeTopic;
     const data = this.buildFilterDataset();
@@ -121,10 +151,22 @@ export class ChatboxComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Filter FAQs for the active topic (or default) by matching title or content using
+   * case-insensitive partial matching.
+   */
+  private computeFilteredFaqs(query: string): Array<{ title: string; content: string }> {
+    const q = query.toLowerCase();
+    const topicKey = this.activeTopic && this.faqCatalog[this.activeTopic] ? this.activeTopic : 'default';
+    const faqs = this.faqCatalog[topicKey] || [];
+    return faqs.filter(f => (f.title?.toLowerCase().includes(q) || f.content?.toLowerCase().includes(q)));
+  }
+
   /** Reset filtering state to show full conversation. */
   private resetFilterView() {
     this.filterMatches = false;
     this.filteredMessages = [];
+    this.filteredFaqs = [];
     this.lastQuery = '';
   }
 
@@ -141,9 +183,10 @@ export class ChatboxComponent implements OnDestroy {
       return;
     }
 
-    // Compute filtered results first (frontend only), and update the UI to show only matches.
+    // Compute filtered results across FAQs and chat history (frontend only)
     this.lastQuery = cleaned;
-    this.filteredMessages = this.computeFilteredResults(cleaned);
+    this.filteredFaqs = this.computeFilteredFaqs(cleaned);
+    this.filteredMessages = this.computeFilteredHistory(cleaned);
     this.filterMatches = true;
 
     this.sending = true;
@@ -171,7 +214,8 @@ export class ChatboxComponent implements OnDestroy {
 
       // Update filtered view to reflect the newly added assistant response too
       // Keep showing only matches after send
-      this.filteredMessages = this.computeFilteredResults(this.lastQuery);
+      this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
+      this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
     } catch (e) {
       const errMsg: ChatMessage = {
         role: 'assistant',
@@ -180,7 +224,8 @@ export class ChatboxComponent implements OnDestroy {
       };
       this.messages.push(errMsg);
       // Update filtered set so the error is visible if it matches query (typically not)
-      this.filteredMessages = this.computeFilteredResults(this.lastQuery);
+      this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
+      this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
       console.error(e);
     } finally {
       this.sending = false;
