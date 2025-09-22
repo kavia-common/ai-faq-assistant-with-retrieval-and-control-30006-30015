@@ -1,0 +1,62 @@
+.panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(249,250,251,0.8));
+  border: 1px solid rgba(37,99,235,0.12);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.08);
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 16px;
+  border-bottom: 1px solid rgba(17,24,39,0.06);
+}
+.panel-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+.hint {
+  font-size: .8rem;
+  color: #374151;
+  opacity: .75;
+  margin-top: 4px;
+}
+
+.topic-list {
+  list-style: none;
+  padding: 8px;
+}
+.topic-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .15s ease, transform .12s ease, border-color .2s ease;
+  border: 1px solid transparent;
+}
+.topic-list li:hover {
+  background: rgba(37,99,235,0.06);
+  transform: translateY(-1px);
+  border-color: rgba(37,99,235,0.16);
+}
+.topic-list li.active {
+  background: linear-gradient(135deg, rgba(37,99,235,0.14), rgba(245,158,11,0.12));
+  border-color: rgba(37,99,235,0.28);
+}
+.topic-title {
+  font-weight: 600;
+  color: #111827;
+}
+.badge {
+  background: rgba(37,99,235,0.12);
+  color: #1D4ED8;
+  border: 1px solid rgba(37,99,235,0.24);
+  border-radius: 999px;
+  font-size: .75rem;
+  padding: 2px 8px;
+  font-weight: 700;
+}

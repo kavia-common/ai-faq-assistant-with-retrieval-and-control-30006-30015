@@ -1,3 +1,14 @@
-<div class="container">
-  <h1>{{ title }}</h1>
+<div class="app-root">
+  <app-header [brand]="title"></app-header>
+
+  <main class="app-content">
+    <aside class="sidebar">
+      <app-sidebar-topics (topicSelected)="onTopicSelected($event)"></app-sidebar-topics>
+    </aside>
+    <section class="chat-container">
+      <app-chatbox></app-chatbox>
+    </section>
+  </main>
+
+  <app-footer></app-footer>
 </div>

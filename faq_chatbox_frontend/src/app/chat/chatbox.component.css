@@ -1,0 +1,113 @@
+.chat {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.7);
+  border-bottom: 1px solid rgba(17,24,39,0.06);
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pulse {
+  width: 10px;
+  height: 10px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16,185,129,0.6);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+.tools .ghost {
+  background: transparent;
+  color: #1F2937;
+  border: 1px solid rgba(17,24,39,0.12);
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.tools .ghost:hover {
+  background: rgba(17,24,39,0.04);
+}
+
+.messages {
+  padding: 16px;
+  overflow: auto;
+  background:
+    radial-gradient(600px 300px at 20% 0%, rgba(37,99,235,0.06), transparent 60%),
+    radial-gradient(600px 240px at 100% 0%, rgba(245,158,11,0.08), transparent 50%);
+}
+.message {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.message .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #2563EB;
+  color: white;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 20px rgba(37,99,235,0.3);
+}
+.message.user .avatar {
+  background: #F59E0B;
+  box-shadow: 0 8px 20px rgba(245,158,11,0.3);
+}
+.message .bubble {
+  background: #ffffff;
+  border: 1px solid rgba(17,24,39,0.08);
+  padding: 12px 14px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+  line-height: 1.5;
+}
+.message.user .bubble {
+  background: rgba(37,99,235,0.06);
+  border-color: rgba(37,99,235,0.18);
+}
+.message.error .bubble {
+  background: rgba(239,68,68,0.06);
+  border-color: rgba(239,68,68,0.28);
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255,255,255,0.9);
+  border-top: 1px solid rgba(17,24,39,0.06);
+}
+.composer input {
+  border: 1px solid rgba(17,24,39,0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .2s ease;
+}
+.composer input:focus {
+  border-color: rgba(37,99,235,0.5);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.14);
+}
+.composer button {
+  min-width: 100px;
+}

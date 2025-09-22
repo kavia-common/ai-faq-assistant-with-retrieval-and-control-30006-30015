@@ -1,0 +1,12 @@
+<div class="panel">
+  <div class="panel-header">
+    <h3>FAQ Topics</h3>
+    <p class="hint">Refine answers by topic</p>
+  </div>
+  <ul class="topic-list">
+    <li *ngFor="let t of topics" (click)="selectTopic(t.id)" [class.active]="t.id === active">
+      <div class="topic-title">{{ t.title }}</div>
+      <span class="badge" *ngIf="t.count !== undefined">{{ t.count }}</span>
+    </li>
+  </ul>
+</div>

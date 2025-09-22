@@ -1,0 +1,27 @@
+<div class="chat">
+  <div class="chat-header">
+    <div class="title">
+      <span class="pulse"></span>
+      <h2>Assistant</h2>
+    </div>
+    <div class="tools">
+      <button class="ghost" (click)="clear()" title="Clear chat">Clear</button>
+    </div>
+  </div>
+
+  <div class="messages">
+    <div *ngFor="let m of messages" class="message" [class.user]="m.role==='user'" [class.error]="m.error">
+      <div class="avatar" [class.user]="m.role==='user'">{{ m.role==='user' ? 'U' : m.role==='assistant' ? 'A' : 'S' }}</div>
+      <div class="bubble">
+        <p>{{ m.content }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="composer">
+    <input type="text" placeholder="Ask a question..." [(ngModel)]="input" (keyup.enter)="send()" [disabled]="sending" />
+    <button (click)="send()" [disabled]="sending || !input.trim()">
+      {{ sending ? 'Sending...' : 'Send' }}
+    </button>
+  </div>
+</div>
