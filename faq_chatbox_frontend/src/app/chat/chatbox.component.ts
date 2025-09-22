@@ -1,13 +1,14 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, Inject } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RagService, ChatMessage } from '../core/rag.service';
 import { TopicsBridgeService } from '../core/topics-bridge.service';
-import { Inject, PLATFORM_ID } from '@angular/core';
+import { PLATFORM_ID } from '@angular/core';
 
 /**
  * Chatbox component provides the main user interaction area with the AI assistant.
  * It integrates with the RAG service and listens to topic changes to refine context.
+ * Refactored: Filtering of FAQs and chat history occurs only when Send is clicked.
  */
 @Component({
   selector: 'app-chatbox',
@@ -28,7 +29,7 @@ export class ChatboxComponent implements OnDestroy {
   /** Holds latest filter feedback message to show to the user, if any. */
   filterFeedback: string | null = null;
 
-  /** When true, UI shows only filtered results computed from current input (live). */
+  /** When true, UI shows only filtered results computed from the last sent input. */
   filterMatches = false;
 
   /** Cached filtered results to show when filterMatches is true. */
@@ -75,7 +76,7 @@ export class ChatboxComponent implements OnDestroy {
     // Listen to topic updates from sidebar
     this.sub = this.topicsBridge.topic$.subscribe((topic) => {
       this.activeTopic = topic;
-      // Reset filter view on topic change; live input will recompute automatically
+      // Reset filtered view on topic change (no live recompute)
       this.resetFilterView();
       // Provide subtle system message to note context change
       if (topic) {
@@ -84,18 +85,14 @@ export class ChatboxComponent implements OnDestroy {
           content: `Context updated to topic: ${topic.replace('-', ' ')}`
         });
       }
-      // If there is text currently in the input, recompute live filters for the new topic
-      if (this.input && this.input.trim().length) {
-        this.updateLiveFilters(this.input);
-      }
     });
   }
 
   /**
-   * Apply lightweight sanitization and filtering on the user input.
+   * Apply lightweight sanitization and validation on the user input.
    * - Trims whitespace
    * - Collapses repeated spaces
-   * - Simple banned-word masking example
+   * - Masks simple banned words
    * - Ensures not empty after cleaning
    * Returns the cleaned text, or null if not acceptable.
    */
@@ -103,7 +100,6 @@ export class ChatboxComponent implements OnDestroy {
     // Basic trim and whitespace normalization
     let text = (raw ?? '').replace(/\s+/g, ' ').trim();
 
-    // When invoked for live changes, allow empty to reset the view.
     if (!text) {
       return { cleaned: null };
     }
@@ -113,9 +109,7 @@ export class ChatboxComponent implements OnDestroy {
     const bannedRegex = new RegExp(`\\b(${banned.join('|')})\\b`, 'gi');
 
     if (bannedRegex.test(text)) {
-      // Option B: mask banned words and proceed
       text = text.replace(bannedRegex, '****');
-      // Provide subtle feedback but allow search/send
       return { cleaned: text, feedback: 'Note: Certain words were masked for safety.' };
     }
 
@@ -125,39 +119,25 @@ export class ChatboxComponent implements OnDestroy {
     return { cleaned: text };
   }
 
-  /**
-   * Build a local dataset to filter from:
-   * - System/assistant seed messages
-   * - Current conversation messages
-   */
+  /** Build a local dataset to filter from (current conversation). */
   private buildFilterDataset(): ChatMessage[] {
-    // Use the current messages as the dataset to filter; this includes assistant greetings and any system notes.
     return this.messages.slice();
   }
 
-  /**
-   * Execute filtering for chat history using the query text.
-   * - Case-insensitive substring match
-   * - If topic is active, keep system "Context updated" notes but otherwise filter uniformly
-   */
+  /** Compute filtered chat history. */
   private computeFilteredHistory(query: string): ChatMessage[] {
     const q = query.toLowerCase();
     const inTopic = this.activeTopic;
     const data = this.buildFilterDataset();
 
     return data.filter(m => {
-      // Always allow system context updates for visibility when topic is active
       const isContextNote = m.role === 'system' && /Context updated to topic/i.test(m.content);
       if (inTopic && isContextNote) return true;
-
       return (m.content || '').toLowerCase().includes(q);
     });
   }
 
-  /**
-   * Filter FAQs for the active topic (or default) by matching title or content using
-   * case-insensitive partial matching.
-   */
+  /** Compute filtered FAQs for current topic (or default). */
   private computeFilteredFaqs(query: string): Array<{ title: string; content: string }> {
     const q = query.toLowerCase();
     const topicKey = this.activeTopic && this.faqCatalog[this.activeTopic] ? this.activeTopic : 'default';
@@ -173,45 +153,19 @@ export class ChatboxComponent implements OnDestroy {
     this.lastQuery = '';
   }
 
-  /** Update filtered view based on a query, enabling grouped live results. */
-  private updateLiveFilters(query: string) {
-    const { cleaned, feedback } = this.filterInput(query);
-    // Set feedback only if present; do not mark invalid on simple empties
-    this.filterFeedback = feedback ?? null;
-
-    if (!cleaned) {
-      // On empty query, reset to full history
-      this.resetFilterView();
-      return;
-    }
-    this.lastQuery = cleaned;
-    this.filteredFaqs = this.computeFilteredFaqs(cleaned);
-    this.filteredMessages = this.computeFilteredHistory(cleaned);
-    this.filterMatches = true;
-  }
-
   // PUBLIC_INTERFACE
-  /** Handle input changes to perform live filtering as the user types. */
-  onInputChanged(value: string) {
-    this.input = value ?? '';
-    // Live-update filters; when cleared, we reset automatically
-    this.updateLiveFilters(this.input);
-  }
-
-  // PUBLIC_INTERFACE
-  /** Send a user message to the assistant; uses RAG/MCP mock pipeline. Keeps live filter active after sending. */
+  /** Send a user message to the assistant; filters FAQs/history only on click/enter. */
   async send() {
     if (this.sending) return;
 
     const { cleaned, feedback } = this.filterInput(this.input);
-    // If user tries to send empty, provide gentle feedback but do not block typing UX
     if (!cleaned) {
       this.filterFeedback = 'Please enter a question before sending.';
       return;
     }
     this.filterFeedback = feedback ?? null;
 
-    // Keep live filtered view based on the message being sent
+    // Compute filtered view only now (no live filtering)
     this.lastQuery = cleaned;
     this.filteredFaqs = this.computeFilteredFaqs(cleaned);
     this.filteredMessages = this.computeFilteredHistory(cleaned);
@@ -219,20 +173,19 @@ export class ChatboxComponent implements OnDestroy {
 
     this.sending = true;
 
-    // Push user message into conversation; clear composer for responsiveness
+    // Push user message and clear input
     this.messages.push({ role: 'user', content: cleaned });
     this.input = '';
 
-    // If masking happened, surface a system note
     if (feedback && /masked/i.test(feedback)) {
       this.messages.push({ role: 'system', content: 'Note: Certain words were masked for safety.' });
     }
 
     try {
-      const response = await this.rag.ask(cleaned, { topic: this.activeTopic ?? undefined });
+      const response = await this.rag.ask(this.lastQuery, { topic: this.activeTopic ?? undefined });
       this.messages.push(response);
 
-      // Refresh current live filter view after assistant response arrives
+      // Re-evaluate filters to include the new assistant message in results for the same query
       if (this.lastQuery) {
         this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
         this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
@@ -245,7 +198,6 @@ export class ChatboxComponent implements OnDestroy {
         error: true
       };
       this.messages.push(errMsg);
-      // Update filtered results to reflect the error message if it matches
       if (this.lastQuery) {
         this.filteredFaqs = this.computeFilteredFaqs(this.lastQuery);
         this.filteredMessages = this.computeFilteredHistory(this.lastQuery);
@@ -272,7 +224,7 @@ export class ChatboxComponent implements OnDestroy {
   }
 
   // PUBLIC_INTERFACE
-  /** Clears the current conversation. */
+  /** Clears the current conversation and resets filtered view. */
   clear() {
     this.messages = [
       { role: 'assistant', content: 'Chat cleared. How can I help you next?' }

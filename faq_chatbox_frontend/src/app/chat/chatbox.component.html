@@ -10,7 +10,7 @@
   </div>
 
   <div class="messages">
-    <!-- Live filter view: updates as user types; falls back to full history when no query -->
+    <!-- Click-to-filter view: shows grouped matches only after Send is pressed -->
     <ng-container *ngIf="filterMatches; else fullHistory">
       <div class="message" *ngIf="filteredFaqs.length === 0 && filteredMessages.length === 0">
         <div class="avatar">A</div>
@@ -75,9 +75,8 @@
   <div class="composer">
     <input
       type="text"
-      placeholder="Ask a question... (live search)"
+      placeholder="Ask a question... (press Send to search)"
       [(ngModel)]="input"
-      (ngModelChange)="onInputChanged($event)"
       (keyup.enter)="send()"
       [disabled]="sending"
       [attr.aria-invalid]="!!filterFeedback"
